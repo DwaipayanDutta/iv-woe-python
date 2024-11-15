@@ -82,3 +82,9 @@ class CategoricalFeature:
         df_lite = self.df.copy()
         df_lite['bin'] = df_lite[self.feature].fillna('MISSING')
         return df_lite[['bin', 'label']]
+
+
+#### Continuous Feature Class
+ContinuousFeature class handles continuous variables by generating bins based on quantiles and ensuring that each bin has a minimum size.
+
+
