@@ -1,4 +1,4 @@
-# README for Information Value (IV) and Weight of Evidence (WOE) Analysis
+# Information Value (IV) and Weight of Evidence (WOE) Analysis
 
 ## Overview
 
