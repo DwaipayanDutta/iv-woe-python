@@ -82,9 +82,115 @@ class CategoricalFeature:
         df_lite = self.df.copy()
         df_lite['bin'] = df_lite[self.feature].fillna('MISSING')
         return df_lite[['bin', 'label']]
-
+```
 
 #### Continuous Feature Class
 ContinuousFeature class handles continuous variables by generating bins based on quantiles and ensuring that each bin has a minimum size.
 
+```python
+import pandas as pd
+import scipy.stats as stats
+
+class ContinuousFeature:
+    def __init__(self, df, feature):
+        self.df = df
+        self.feature = feature
+        self.bin_min_size = int(len(self.df) * 0.05)
+
+    def __generate_bins(self, bins_num):
+        df = self.df[[self.feature, 'label']].copy()
+        df['bin'] = pd.qcut(df[self.feature], bins_num, duplicates='drop').apply(lambda x: x.left).astype(float)
+        return df
+
+    def __generate_correct_bins(self, bins_max=20):
+        for bins_num in range(bins_max, 1, -1):
+            df = self.__generate_bins(bins_num)
+            df_grouped = pd.DataFrame(df.groupby('bin').agg({self.feature: 'count', 'label': 'sum'})).reset_index()
+            r, p = stats.spearmanr(df_grouped['bin'], df_grouped['label'])
+            if (
+                abs(r) == 1 and  # Check if WOE for bins are monotonic
+                df_grouped[self.feature].min() > self.bin_min_size and  # Check if bin size is greater than 5%
+                not (df_grouped[self.feature] == df_grouped['label']).any()  # Check if number of good and bad is not equal to 0
+            ):
+                break
+        return df
+
+    @property
+    def df_lite(self):
+        df_lite = self.__generate_correct_bins()
+        # Handle missing values without inplace assignment
+        df_lite['bin'].fillna('MISSING', inplace=True)
+        return df_lite[['bin', 'label']]
+```
+
+#### IV Calculation
+The IV class calculates Information Value based on the defined features.
+
+```python
+import numpy as np
+
+class IV:
+    @staticmethod
+    def __perc_share(df, group_name):
+        return df[group_name] / df[group_name].sum()
+
+    def __calculate_perc_share(self, feat):
+        df = feat.df_lite.groupby('bin').agg({feat.target_column: ['count', 'sum']}).reset_index()
+        df.columns = [feat.feature, 'count', 'good']
+        df['bad'] = df['count'] - df['good']
+        return df
+
+    def __calculate_woe(self, feat):
+        df = self.__calculate_perc_share(feat)
+        
+        # Calculate percentages while avoiding division by zero
+        total_good = df['good'].sum()
+        total_bad = df['bad'].sum()
+
+        # Avoid division by zero by adding a small value (epsilon)
+        epsilon = 1e-10
+        
+        # Calculate WOE safely
+        with np.errstate(divide='ignore', invalid='ignore'):
+            df['perc_good'] = (df['good'] + epsilon) / (total_good + epsilon)
+            df['perc_bad'] = (df['bad'] + epsilon) / (total_bad + epsilon)
+            df['woe'] = np.log(df['perc_good'] / df['perc_bad'])
+        
+        return df
+
+    def calculate_iv(self, feat):
+        iv_df = self.__calculate_woe(feat)
+
+        # Calculate IV safely while avoiding NaN values in WOE calculation
+        iv_df['iv'] = (iv_df['perc_good'] - iv_df['perc_bad']) * iv_df['woe']
+        
+        return iv_df, iv_df['iv'].sum()
+
+    @staticmethod
+    def interpretation(iv):
+        if iv < 0.02:
+            return 'useless'
+        elif iv < 0.1:
+            return 'weak'
+        elif iv < 0.3:
+            return 'medium'
+        elif iv < 0.5:
+            return 'strong'
+        else:
+            return 'suspicious'
+```
+
+#### Visualization
+This section provides functions to visualize IV and WOE values
+```python
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+def draw_iv(feat):
+    iv_df, iv_value = feat.calculate_iv()
+    fig, ax = plt.subplots(figsize=(10,6))
+    sns.barplot(x=feat.feature, y='woe', data=iv_df, palette='viridis')
+    ax.set_title('WOE visualization for: ' + feat.feature)
+    plt.show()
+```
 
