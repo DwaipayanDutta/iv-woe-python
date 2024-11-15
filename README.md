@@ -193,4 +193,25 @@ def draw_iv(feat):
     ax.set_title('WOE visualization for: ' + feat.feature)
     plt.show()
 ```
+# Interpreting IV Values
 
+The interpretation of IV values can be summarized as follows:
+
+| Information Value | Predictive Power                |
+|-------------------|----------------------------------|
+| < 0.02            | Useless for prediction            |
+| 0.02 to 0.1       | Weak predictor                   |
+| 0.1 to 0.3        | Medium predictor                 |
+| 0.3 to 0.5        | Strong predictor                 |
+| > 0.5             | Suspicious or too good to be true|
+
+## Logistic Regression with WOE
+
+Once WOE values are calculated, they can be used as independent variables in logistic regression models, enhancing model performance by providing a linear relationship with the log odds.
+
+### Example Logistic Regression Output
+
+| Predictor         | Coefficient | Std Error | z-value | p-value |
+|-------------------|-------------|-----------|---------|---------|
+| Constant          | -3.66223    | 0.0263162 | -139.16 | 0       |
+| WOE Age           | -1          | 0.0796900 | -12.55  | 0       |
